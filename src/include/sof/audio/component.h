@@ -723,6 +723,43 @@ static inline bool comp_is_scheduling_source(struct comp_dev *dev)
 }
 
 /**
+ * Called to check whether component is ready to process its data.
+ * @param dev Component device.
+ * @return True if component is ready, false otherwise.
+ */
+static inline bool comp_is_copy_ready(struct comp_dev *dev)
+{
+	struct comp_buffer *source;
+	struct comp_buffer *sink;
+
+	/* component requires minimal number of input bytes to run */
+	if (dev->min_source_bytes) {
+		source = list_first_item(&dev->bsource_list, struct comp_buffer,
+					 sink_list);
+		if (source->avail < dev->min_source_bytes) {
+			tracev_comp_with_ids(dev,
+					     "comp_is_copy_ready(): not enough input bytes: %u",
+					     source->avail);
+			return false;
+		}
+	}
+
+	/* component requires minimal output free space */
+	if (dev->min_sink_bytes) {
+		sink = list_first_item(&dev->bsink_list, struct comp_buffer,
+				       source_list);
+		if (sink->free < dev->min_sink_bytes) {
+			tracev_comp_with_ids(dev,
+					     "comp_is_copy_ready(): not enough output bytes: %u",
+					     sink->free);
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/**
  * Called by component in copy.
  * @param dev Component device.
  * @param cl Struct of parameters for use in copy function.
