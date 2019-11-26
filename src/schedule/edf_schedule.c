@@ -81,6 +81,7 @@ static void edf_scheduler_run(void *data)
 		if (current >= deadline &&
 		    !(task->flags & SOF_SCHEDULE_FLAG_IDLE)) {
 			/* task needs to be scheduled ASAP */
+			trace_edf_sch_error("edf_scheduler_run() error: task missed its deadline");
 			task_next = task;
 			break;
 		}
