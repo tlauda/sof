@@ -259,6 +259,10 @@ struct comp_dev {
 				     *  to run component's processing
 				     */
 
+	uint64_t cpc;		   /**< cycles per data chunk needed to finish
+				     *  processing
+				     */
+
 	/** common runtime configuration for downstream/upstream */
 	struct sof_ipc_stream_params params;
 
