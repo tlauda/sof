@@ -43,6 +43,7 @@ enum task_state {
 
 struct task {
 	uint64_t start;
+	uint64_t period;
 	uint16_t type;
 	uint16_t priority;
 	uint16_t core;

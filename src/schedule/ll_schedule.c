@@ -59,10 +59,9 @@ static bool schedule_ll_is_pending(struct ll_schedule_data *sch)
 static void schedule_ll_task_update_start(struct ll_schedule_data *sch,
 					  struct task *task, uint64_t last_tick)
 {
-	struct ll_task_pdata *pdata = ll_sch_get_pdata(task);
 	uint64_t next;
 
-	next = sch->domain->ticks_per_ms * pdata->period / 1000;
+	next = sch->domain->ticks_per_ms * task->period / 1000;
 
 	if (sch->domain->synchronous)
 		task->start += next;
@@ -240,7 +239,6 @@ static void schedule_ll_task(void *data, struct task *task, uint64_t start,
 			     uint64_t period)
 {
 	struct ll_schedule_data *sch = data;
-	struct ll_task_pdata *pdata;
 	struct list_item *tlist;
 	struct task *curr_task;
 	uint32_t flags;
@@ -256,13 +254,7 @@ static void schedule_ll_task(void *data, struct task *task, uint64_t start,
 			goto out;
 	}
 
-	pdata = ll_sch_get_pdata(task);
-
-	/* invalidate if slave core */
-	if (cpu_is_slave(task->core))
-		dcache_invalidate_region(pdata, sizeof(*pdata));
-
-	pdata->period = period;
+	task->period = period;
 
 	/* insert task into the list */
 	schedule_ll_task_insert(task, &sch->tasks);
@@ -286,41 +278,16 @@ out:
 
 static int schedule_ll_task_init(void *data, struct task *task)
 {
-	struct ll_task_pdata *ll_pdata;
-
-	if (ll_sch_get_pdata(task))
-		return -EEXIST;
-
-	ll_pdata = rzalloc(RZONE_SYS_RUNTIME, SOF_MEM_CAPS_RAM,
-			   sizeof(*ll_pdata));
-
-	if (!ll_pdata) {
-		trace_ll_error("schedule_ll_task_init() error: alloc failed");
-		return -ENOMEM;
-	}
-
-	/* flush for slave core */
-	if (cpu_is_slave(task->core))
-		dcache_writeback_invalidate_region(ll_pdata,
-						   sizeof(*ll_pdata));
-
-	ll_sch_set_pdata(task, ll_pdata);
-
 	return 0;
 }
 
 static void schedule_ll_task_free(void *data, struct task *task)
 {
-	struct ll_task_pdata *ll_pdata;
 	uint32_t flags;
 
 	irq_local_disable(flags);
 
-	/* release the resources */
 	task->state = SOF_TASK_STATE_FREE;
-	ll_pdata = ll_sch_get_pdata(task);
-	rfree(ll_pdata);
-	ll_sch_set_pdata(task, NULL);
 
 	irq_local_enable(flags);
 }

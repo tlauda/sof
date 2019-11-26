@@ -136,6 +136,8 @@ static void schedule_edf_task(void *data, struct task *task, uint64_t start,
 
 	ticks_per_ms = clock_ms_to_ticks(edf_sch->clock, 1);
 
+	task->period = period;
+
 	/* calculate start time */
 	task->start = start ? task->start + ticks_per_ms * start / 1000 :
 		current;

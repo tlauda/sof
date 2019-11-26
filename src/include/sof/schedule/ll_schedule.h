@@ -16,7 +16,6 @@
 #include <sof/schedule/task.h>
 #include <sof/trace/trace.h>
 #include <user/trace.h>
-#include <stdint.h>
 
 struct ll_schedule_domain;
 
@@ -29,15 +28,6 @@ struct ll_schedule_domain;
 
 #define tracev_ll(format, ...) \
 	tracev_event(TRACE_CLASS_SCHEDULE_LL, format, ##__VA_ARGS__)
-
-#define ll_sch_set_pdata(task, data) \
-	do { (task)->private = (data); } while (0)
-
-#define ll_sch_get_pdata(task) ((task)->private)
-
-struct ll_task_pdata {
-	uint64_t period;
-};
 
 int scheduler_init_ll(struct ll_schedule_domain *domain);
 
