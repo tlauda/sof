@@ -89,6 +89,10 @@ struct sof_ipc_buffer {
 	uint32_t caps;		/**< SOF_MEM_CAPS_ */
 } __attribute__((packed));
 
+/* component processing domains */
+#define SOF_COMP_PROC_DOMAIN_LL	0	/* low latency */
+#define SOF_COMP_PROC_DOMAIN_DP	1	/* data processing */
+
 /* generic component config data - must always be after struct sof_ipc_comp */
 struct sof_ipc_comp_config {
 	struct sof_ipc_cmd_hdr hdr;
@@ -97,9 +101,10 @@ struct sof_ipc_comp_config {
 	uint32_t reserved1;	/**< reserved */
 	uint32_t frame_fmt;	/**< SOF_IPC_FRAME_ */
 	uint32_t xrun_action;
+	uint32_t proc_domain;	/**< SOF_COMP_PROC_DOMAIN_ */
 
 	/* reserved for future use */
-	uint32_t reserved[2];
+	uint32_t reserved[1];
 } __attribute__((packed));
 
 /* generic host component */
