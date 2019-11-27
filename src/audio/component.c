@@ -10,6 +10,8 @@
 #include <sof/drivers/interrupt.h>
 #include <sof/lib/alloc.h>
 #include <sof/list.h>
+#include <sof/schedule/schedule.h>
+#include <sof/schedule/task.h>
 #include <sof/string.h>
 #include <ipc/topology.h>
 #include <errno.h>
@@ -46,6 +48,27 @@ out:
 	return drv;
 }
 
+static struct task *comp_task_init(struct comp_dev *dev)
+{
+	struct task *task = NULL;
+	struct task_ops ops = {
+		.run = comp_task,
+		.is_ready = comp_is_ready,
+		.complete = NULL };
+
+	task = rzalloc(RZONE_RUNTIME, SOF_MEM_CAPS_RAM, sizeof(*task));
+	if (!task)
+		return NULL;
+
+	if (schedule_task_init(task, SOF_SCHEDULE_EDF, SOF_TASK_PRI_MED, &ops,
+			       dev, 0, 0) < 0) {
+		rfree(task);
+		return NULL;
+	}
+
+	return task;
+}
+
 struct comp_dev *comp_new(struct sof_ipc_comp *comp)
 {
 	struct comp_dev *cdev;
@@ -72,6 +95,15 @@ struct comp_dev *comp_new(struct sof_ipc_comp *comp)
 	ret = memcpy_s(&cdev->comp, sizeof(cdev->comp),
 		       comp, sizeof(*comp));
 	assert(!ret);
+
+	/* init task for data processing component */
+	if (!comp_is_low_latency(cdev)) {
+		cdev->task = comp_task_init(cdev);
+		if (!cdev->task) {
+			trace_comp_error("comp_new() error: task init failed");
+			return NULL;
+		}
+	}
 
 	cdev->drv = drv;
 	list_init(&cdev->bsource_list);

@@ -22,6 +22,7 @@
 #include <sof/debug/panic.h>
 #include <sof/list.h>
 #include <sof/math/numbers.h>
+#include <sof/schedule/task.h>
 #include <sof/trace/trace.h>
 #include <ipc/control.h>
 #include <ipc/stream.h>
@@ -262,6 +263,8 @@ struct comp_dev {
 	uint64_t cpc;		   /**< cycles per data chunk needed to finish
 				     *  processing
 				     */
+
+	struct task *task;	   /**< processing task */
 
 	/** common runtime configuration for downstream/upstream */
 	struct sof_ipc_stream_params params;
@@ -773,6 +776,29 @@ static inline bool comp_is_copy_ready(struct comp_dev *dev)
 	}
 
 	return true;
+}
+
+/**
+ * DP component's task.
+ * @param arg Component device.
+ * @return SOF_TASK_STATE_COMPLETED if copy returned error,
+ *         SOF_TASK_STATE_RESCHEDULE otherwise.
+ */
+static inline enum task_state comp_task(void *arg)
+{
+	/* complete task in case of error */
+	return comp_copy(arg) < 0 ?
+		SOF_TASK_STATE_COMPLETED : SOF_TASK_STATE_RESCHEDULE;
+}
+
+/**
+ * Wrapper to comp_is_copy_ready().
+ * @param arg Component device.
+ * @return True if comp_is_copy_ready() returned true, false otherwise.
+ */
+static inline bool comp_is_ready(void *arg)
+{
+	return comp_is_copy_ready(arg);
 }
 
 /**
