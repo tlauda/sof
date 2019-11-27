@@ -31,18 +31,33 @@ struct edf_schedule_data {
 
 struct scheduler_ops schedule_edf_ops;
 
+static void reschedule_edf_task(void *data, struct task *task, uint64_t start);
 static void schedule_edf_task_complete(void *data, struct task *task);
 static void schedule_edf_task_running(void *data, struct task *task);
 static void schedule_edf(void *data);
 
 static void schedule_edf_task_run(struct task *task, void *data)
 {
+	enum task_state state;
+
 	while (1) {
-		/* execute task run function and remove task from the list
-		 * only if completed
-		 */
-		if (task->run(task->data) == SOF_TASK_STATE_COMPLETED)
+		/* execute task run function */
+		state = task->run(task->data);
+
+		switch (state) {
+		case SOF_TASK_STATE_COMPLETED:
+			/* remove task from the list only if completed */
 			schedule_edf_task_complete(data, task);
+			break;
+		case SOF_TASK_STATE_RESCHEDULE:
+			/* recalculate deadline and schedule again */
+			reschedule_edf_task(data, task, 0);
+			break;
+		default:
+			trace_edf_sch_error("schedule_edf_task_run() error: wrong task state %d",
+					    state);
+			break;
+		}
 
 		/* find new task for execution */
 		schedule_edf(data);
@@ -160,6 +175,37 @@ static void schedule_edf_task(void *data, struct task *task, uint64_t start,
 	irq_local_enable(flags);
 
 	schedule_edf(data);
+}
+
+static void reschedule_edf_task(void *data, struct task *task, uint64_t start)
+{
+	struct edf_schedule_data *edf_sch = data;
+	struct list_item *tlist;
+	struct task *curr_task;
+	uint32_t flags;
+
+	irq_local_disable(flags);
+
+	/* check to see if we are already scheduled */
+	list_for_item(tlist, &edf_sch->list) {
+		curr_task = container_of(tlist, struct task, list);
+		if (curr_task == task)
+			/* found it */
+			break;
+	}
+
+	/* task not scheduled */
+	if (curr_task != task) {
+		trace_edf_sch_error("reschedule_edf_task() error: no task to reschedule");
+		irq_local_enable(flags);
+		return;
+	}
+
+	schedule_edf_set_deadline_data(edf_sch, task, start);
+
+	task->state = SOF_TASK_STATE_QUEUED;
+
+	irq_local_enable(flags);
 }
 
 static int schedule_edf_task_init(void *data, struct task *task)
@@ -327,7 +373,7 @@ struct scheduler_ops schedule_edf_ops = {
 	.schedule_task_init	= schedule_edf_task_init,
 	.schedule_task_running	= schedule_edf_task_running,
 	.schedule_task_complete = schedule_edf_task_complete,
-	.reschedule_task	= NULL,
+	.reschedule_task	= reschedule_edf_task,
 	.schedule_task_cancel	= schedule_edf_task_cancel,
 	.schedule_task_free	= schedule_edf_task_free,
 	.scheduler_free		= scheduler_free_edf,
