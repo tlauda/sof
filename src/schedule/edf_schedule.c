@@ -23,6 +23,7 @@
 #include <stdint.h>
 
 struct edf_schedule_data {
+	uint64_t ticks_per_ms;
 	struct list_item list;	/* list of tasks in priority queue */
 	uint32_t clock;
 	int irq;
@@ -117,7 +118,6 @@ static void schedule_edf_task(void *data, struct task *task, uint64_t start,
 	struct edf_task_pdata *edf_pdata = edf_sch_get_pdata(task);
 	uint32_t flags;
 	uint64_t current;
-	uint64_t ticks_per_ms;
 
 	irq_local_disable(flags);
 
@@ -134,16 +134,16 @@ static void schedule_edf_task(void *data, struct task *task, uint64_t start,
 	/* get current time */
 	current = platform_timer_get(platform_timer);
 
-	ticks_per_ms = clock_ms_to_ticks(edf_sch->clock, 1);
-
 	task->period = period;
 
 	/* calculate start time */
-	task->start = start ? task->start + ticks_per_ms * start / 1000 :
+	task->start = start ?
+		task->start + edf_sch->ticks_per_ms * start / 1000 :
 		current;
 
 	/* calculate deadline */
-	edf_pdata->deadline = task->start + ticks_per_ms * period / 1000;
+	edf_pdata->deadline = task->start +
+		edf_sch->ticks_per_ms * period / 1000;
 
 	/* add task to the list */
 	list_item_append(&task->list, &edf_sch->list);
@@ -270,6 +270,7 @@ int scheduler_init_edf(void)
 	edf_sch = rzalloc(RZONE_SYS, SOF_MEM_CAPS_RAM, sizeof(*edf_sch));
 	list_init(&edf_sch->list);
 	edf_sch->clock = PLATFORM_DEFAULT_CLOCK;
+	edf_sch->ticks_per_ms = clock_ms_to_ticks(edf_sch->clock, 1);
 
 	scheduler_init(SOF_SCHEDULE_EDF, &schedule_edf_ops, edf_sch);
 
