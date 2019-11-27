@@ -90,6 +90,10 @@ static void edf_scheduler_run(void *data)
 		    task->state != SOF_TASK_STATE_RUNNING)
 			continue;
 
+		/* task is not yet ready to be run */
+		if (task->ops.is_ready && !task->ops.is_ready(task->data))
+			continue;
+
 		edf_pdata = edf_sch_get_pdata(task);
 
 		deadline = edf_pdata->deadline;

@@ -333,7 +333,8 @@ static uint32_t idc_get_done_bit_mask(int core)
  */
 int idc_init(void)
 {
-	struct task_ops ops = { .run = idc_do_cmd, .complete = NULL };
+	struct task_ops ops = {
+		.run = idc_do_cmd, .complete = NULL, .is_ready = NULL };
 	int core = cpu_get_id();
 	int ret;
 

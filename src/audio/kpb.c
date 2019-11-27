@@ -97,7 +97,8 @@ static struct comp_dev *kpb_new(struct sof_ipc_comp *comp)
 {
 	struct sof_ipc_comp_process *ipc_process =
 					(struct sof_ipc_comp_process *)comp;
-	struct task_ops ops = { .run = kpb_draining_task, .complete = NULL };
+	struct task_ops ops = {
+		.run = kpb_draining_task, .complete = NULL, .is_ready = NULL };
 	size_t bs = ipc_process->size;
 	struct comp_dev *dev;
 	struct comp_data *kpb;

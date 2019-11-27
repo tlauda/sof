@@ -1495,7 +1495,8 @@ static void dmic_irq_handler(void *data)
 
 static int dmic_probe(struct dai *dai)
 {
-	struct task_ops ops = { .run = dmic_work, .complete = NULL };
+	struct task_ops ops = {
+		.run = dmic_work, .complete = NULL, .is_ready = NULL };
 	int irq = dmic_irq(dai);
 	struct dmic_pdata *dmic;
 	int ret;

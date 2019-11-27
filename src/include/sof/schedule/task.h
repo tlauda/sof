@@ -44,6 +44,7 @@ enum task_state {
 struct task_ops {
 	enum task_state (*run)(void *data);
 	void (*complete)(void *data);
+	bool (*is_ready)(void *data);
 };
 
 struct task {

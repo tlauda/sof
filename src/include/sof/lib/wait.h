@@ -66,7 +66,8 @@ static inline void wait_completed(completion_t *comp)
 static inline void wait_init(completion_t *comp)
 {
 	volatile completion_t *c = (volatile completion_t *)comp;
-	struct task_ops ops = { .run = _wait_cb, .complete = NULL };
+	struct task_ops ops = {
+		.run = _wait_cb, .complete = NULL, .is_ready = NULL };
 
 	c->complete = 0;
 

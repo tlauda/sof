@@ -281,7 +281,8 @@ int platform_ipc_init(struct ipc *ipc)
 	int irq;
 	struct task_ops ops = {
 		.run = ipc_platform_do_cmd,
-		.complete = ipc_platform_complete_cmd };
+		.complete = ipc_platform_complete_cmd,
+		.is_ready = NULL };
 
 	_ipc = ipc;
 

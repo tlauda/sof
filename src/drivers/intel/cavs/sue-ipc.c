@@ -76,7 +76,10 @@ out:
 
 int platform_ipc_init(struct ipc *ipc)
 {
-	struct task_ops ops = { .run = ipc_platform_do_cmd, .complete = NULL };
+	struct task_ops ops = {
+		.run = ipc_platform_do_cmd,
+		.complete = NULL,
+		.is_ready = NULL };
 
 	_ipc = ipc;
 

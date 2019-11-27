@@ -41,6 +41,7 @@ int schedule_task_init(struct task *task, uint16_t type, uint16_t priority,
 	task->state = SOF_TASK_STATE_INIT;
 	task->ops.run = ops->run;
 	task->ops.complete = ops->complete;
+	task->ops.is_ready = ops->is_ready;
 	task->data = data;
 
 	list_for_item(slist, &schedulers->list) {

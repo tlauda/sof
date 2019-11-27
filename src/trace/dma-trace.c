@@ -116,7 +116,8 @@ int dma_trace_init_early(struct sof *sof)
 
 int dma_trace_init_complete(struct dma_trace_data *d)
 {
-	struct task_ops ops = { .run = trace_work, .complete = NULL };
+	struct task_ops ops = {
+		.run = trace_work, .complete = NULL, .is_ready = NULL };
 	int ret;
 
 	trace_buffer("dma_trace_init_complete()");

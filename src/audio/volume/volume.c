@@ -137,7 +137,8 @@ static struct comp_dev *volume_new(struct sof_ipc_comp *comp)
 	struct sof_ipc_comp_volume *vol;
 	struct sof_ipc_comp_volume *ipc_vol =
 		(struct sof_ipc_comp_volume *)comp;
-	struct task_ops ops = { .run = vol_work, .complete = NULL };
+	struct task_ops ops = {
+		.run = vol_work, .complete = NULL, .is_ready = NULL };
 	struct comp_data *cd;
 	int i;
 	int ret;
