@@ -111,13 +111,30 @@ static void edf_scheduler_run(void *data)
 	schedule_edf_task_running(data, task_next);
 }
 
+static void schedule_edf_set_deadline_data(struct edf_schedule_data *data,
+					   struct task *task, uint64_t start)
+{
+	struct edf_task_pdata *edf_pdata = edf_sch_get_pdata(task);
+	uint64_t current;
+
+	/* get current time */
+	current = platform_timer_get(platform_timer);
+
+	/* calculate start time */
+	task->start = start ? task->start + data->ticks_per_ms * start / 1000 :
+		current;
+
+	/* calculate deadline */
+	edf_pdata->deadline = task->start +
+		data->ticks_per_ms * task->period / 1000;
+}
+
 static void schedule_edf_task(void *data, struct task *task, uint64_t start,
 			      uint64_t period)
 {
 	struct edf_schedule_data *edf_sch = data;
 	struct edf_task_pdata *edf_pdata = edf_sch_get_pdata(task);
 	uint32_t flags;
-	uint64_t current;
 
 	irq_local_disable(flags);
 
@@ -131,19 +148,9 @@ static void schedule_edf_task(void *data, struct task *task, uint64_t start,
 		return;
 	}
 
-	/* get current time */
-	current = platform_timer_get(platform_timer);
-
 	task->period = period;
 
-	/* calculate start time */
-	task->start = start ?
-		task->start + edf_sch->ticks_per_ms * start / 1000 :
-		current;
-
-	/* calculate deadline */
-	edf_pdata->deadline = task->start +
-		edf_sch->ticks_per_ms * period / 1000;
+	schedule_edf_set_deadline_data(edf_sch, task, start);
 
 	/* add task to the list */
 	list_item_append(&task->list, &edf_sch->list);
