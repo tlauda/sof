@@ -727,6 +727,18 @@ static inline bool comp_is_scheduling_source(struct comp_dev *dev)
 }
 
 /**
+ * Called to check whether component works in low latency processing domain.
+ * @param dev Component device.
+ * @return True if this is low latency component, false otherwise.
+ */
+static inline bool comp_is_low_latency(struct comp_dev *dev)
+{
+	struct sof_ipc_comp_config *config = COMP_GET_CONFIG(dev);
+
+	return config->proc_domain == SOF_COMP_PROC_DOMAIN_LL;
+}
+
+/**
  * Called to check whether component is ready to process its data.
  * @param dev Component device.
  * @return True if component is ready, false otherwise.
