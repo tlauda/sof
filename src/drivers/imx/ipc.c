@@ -170,6 +170,9 @@ struct ipc_data_host_buffer *ipc_platform_get_host_buffer(struct ipc *ipc)
 
 int platform_ipc_init(struct ipc *ipc)
 {
+	struct task_ops ops = {
+		.run = ipc_platform_do_cmd,
+		.complete = ipc_platform_complete_cmd };
 #if CONFIG_HOST_PTABLE
 	struct ipc_data *iipc;
 
@@ -186,8 +189,7 @@ int platform_ipc_init(struct ipc *ipc)
 
 	/* schedule */
 	schedule_task_init(&_ipc->ipc_task, SOF_SCHEDULE_EDF, SOF_TASK_PRI_IPC,
-			   ipc_platform_do_cmd, ipc_platform_complete_cmd, _ipc,
-			   0, 0);
+			   &ops, _ipc, 0, 0);
 
 #if CONFIG_HOST_PTABLE
 	/* allocate page table buffer */

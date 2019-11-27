@@ -62,6 +62,7 @@ static enum task_state validate(void *data)
 
 void sa_init(struct sof *sof, uint64_t timeout)
 {
+	struct task_ops ops = { .run = validate, .complete = NULL };
 	uint64_t ticks;
 
 	trace_sa("sa_init(), timeout = %u", timeout);
@@ -81,7 +82,7 @@ void sa_init(struct sof *sof, uint64_t timeout)
 		 sa->panic_timeout);
 
 	schedule_task_init(&sa->work, SOF_SCHEDULE_LL_TIMER, SOF_TASK_PRI_HIGH,
-			   validate, NULL, sa, 0, 0);
+			   &ops, sa, 0, 0);
 
 	schedule_task(&sa->work, 0, timeout);
 

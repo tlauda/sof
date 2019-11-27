@@ -1495,6 +1495,7 @@ static void dmic_irq_handler(void *data)
 
 static int dmic_probe(struct dai *dai)
 {
+	struct task_ops ops = { .run = dmic_work, .complete = NULL };
 	int irq = dmic_irq(dai);
 	struct dmic_pdata *dmic;
 	int ret;
@@ -1533,7 +1534,7 @@ static int dmic_probe(struct dai *dai)
 
 	/* Initialize start sequence handler */
 	schedule_task_init(&dmic->dmicwork, SOF_SCHEDULE_LL_TIMER,
-			   SOF_TASK_PRI_MED, dmic_work, NULL, dai, 0, 0);
+			   SOF_TASK_PRI_MED, &ops, dai, 0, 0);
 
 	/* Enable DMIC power */
 	pm_runtime_get_sync(DMIC_POW, dai->index);

@@ -60,12 +60,13 @@ void task_main_init(void)
 	int ret;
 	task_main main_main = cpu == PLATFORM_MASTER_CORE_ID ?
 		&task_main_master_core : &task_main_slave_core;
+	struct task_ops ops = { .run = main_main, .complete = NULL };
 
 	*main_task = rzalloc(RZONE_SYS, SOF_MEM_CAPS_RAM, sizeof(**main_task));
 
 	ret = schedule_task_init(*main_task, SOF_SCHEDULE_EDF,
-				 SOF_TASK_PRI_IDLE, main_main, NULL, NULL,
-				 cpu, SOF_SCHEDULE_FLAG_IDLE);
+				 SOF_TASK_PRI_IDLE, &ops, NULL, cpu,
+				 SOF_SCHEDULE_FLAG_IDLE);
 	assert(!ret);
 }
 

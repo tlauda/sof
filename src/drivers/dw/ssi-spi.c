@@ -375,6 +375,7 @@ static int spi_slave_init(struct spi *spi)
 {
 	struct spi_dma_config *config = spi->config + SPI_DIR_RX;
 	struct gpio_config gpio_cfg = {.direction = GPIO_DIRECTION_OUTPUT};
+	struct task_ops ops = { .run = spi_completion_work, .complete = NULL };
 	int ret;
 
 	/* A GPIO to signal host IPC IRQ */
@@ -405,8 +406,7 @@ static int spi_slave_init(struct spi *spi)
 	spi->completion.private = NULL;
 
 	ret = schedule_task_init(&spi->completion, SOF_SCHEDULE_LL_DMA,
-				 SOF_TASK_PRI_MED, spi_completion_work, NULL,
-				 spi, 0, 0);
+				 SOF_TASK_PRI_MED, &ops, spi, 0, 0);
 	if (ret < 0)
 		return ret;
 

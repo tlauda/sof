@@ -41,6 +41,11 @@ enum task_state {
 	SOF_TASK_STATE_RESCHEDULE,
 };
 
+struct task_ops {
+	enum task_state (*run)(void *data);
+	void (*complete)(void *data);
+};
+
 struct task {
 	uint64_t start;
 	uint64_t period;
@@ -50,10 +55,9 @@ struct task {
 	uint16_t flags;
 	enum task_state state;
 	void *data;
-	enum task_state (*run)(void *data);
-	void (*complete)(void *data);
 	struct list_item list;
 	void *private;
+	struct task_ops ops;
 };
 
 /** \brief Task type registered by pipelines. */

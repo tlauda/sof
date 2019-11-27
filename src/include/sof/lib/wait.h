@@ -66,11 +66,12 @@ static inline void wait_completed(completion_t *comp)
 static inline void wait_init(completion_t *comp)
 {
 	volatile completion_t *c = (volatile completion_t *)comp;
+	struct task_ops ops = { .run = _wait_cb, .complete = NULL };
 
 	c->complete = 0;
 
 	schedule_task_init(&comp->work, SOF_SCHEDULE_LL_TIMER, SOF_TASK_PRI_MED,
-			   _wait_cb, NULL, comp, 0, 0);
+			   &ops, comp, 0, 0);
 }
 
 static inline void wait_clear(completion_t *comp)

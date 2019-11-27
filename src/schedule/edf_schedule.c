@@ -42,7 +42,7 @@ static void schedule_edf_task_run(struct task *task, void *data)
 
 	while (1) {
 		/* execute task run function */
-		state = task->run(task->data);
+		state = task->ops.run(task->data);
 
 		switch (state) {
 		case SOF_TASK_STATE_COMPLETED:
@@ -271,8 +271,8 @@ static void schedule_edf_task_complete(void *data, struct task *task)
 	irq_local_disable(flags);
 
 	/* execute task complete function if exists */
-	if (task->complete)
-		task->complete(task->data);
+	if (task->ops.complete)
+		task->ops.complete(task->data);
 
 	task->state = SOF_TASK_STATE_COMPLETED;
 	list_item_del(&task->list);

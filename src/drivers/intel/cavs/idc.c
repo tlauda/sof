@@ -333,6 +333,7 @@ static uint32_t idc_get_done_bit_mask(int core)
  */
 int idc_init(void)
 {
+	struct task_ops ops = { .run = idc_do_cmd, .complete = NULL };
 	int core = cpu_get_id();
 	int ret;
 
@@ -346,7 +347,7 @@ int idc_init(void)
 
 	/* process task */
 	schedule_task_init(&(*idc)->idc_task, SOF_SCHEDULE_EDF,
-			   SOF_TASK_PRI_IDC, idc_do_cmd, NULL, *idc, core, 0);
+			   SOF_TASK_PRI_IDC, &ops, *idc, core, 0);
 
 	/* configure interrupt */
 	(*idc)->irq = interrupt_get_irq(PLATFORM_IDC_INTERRUPT,

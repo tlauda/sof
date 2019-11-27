@@ -76,13 +76,15 @@ out:
 
 int platform_ipc_init(struct ipc *ipc)
 {
+	struct task_ops ops = { .run = ipc_platform_do_cmd, .complete = NULL };
+
 	_ipc = ipc;
 
 	ipc_set_drvdata(_ipc, NULL);
 
 	/* schedule */
 	schedule_task_init(&_ipc->ipc_task, SOF_SCHEDULE_EDF, SOF_TASK_PRI_MED,
-			   ipc_platform_do_cmd, NULL, _ipc, 0, 0);
+			   &ops, _ipc, 0, 0);
 
 	return 0;
 }

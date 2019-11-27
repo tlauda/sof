@@ -352,14 +352,15 @@ int pipeline_params(struct pipeline *p, struct comp_dev *host,
 static struct task *pipeline_task_init(struct pipeline *p, uint32_t type,
 				       enum task_state (*func)(void *data))
 {
+	struct task_ops ops = { .run = func, .complete = NULL };
 	struct pipeline_task *task = NULL;
 
 	task = rzalloc(RZONE_RUNTIME, SOF_MEM_CAPS_RAM, sizeof(*task));
 	if (!task)
 		return NULL;
 
-	if (schedule_task_init(&task->task, type, p->ipc_pipe.priority, func,
-			       NULL, p, p->ipc_pipe.core, 0) < 0) {
+	if (schedule_task_init(&task->task, type, p->ipc_pipe.priority, &ops, p,
+			       p->ipc_pipe.core, 0) < 0) {
 		rfree(task);
 		return NULL;
 	}
