@@ -636,7 +636,8 @@ static int dai_copy(struct comp_dev *dev)
 	uint32_t sink_samples;
 	int ret = 0;
 
-	tracev_dai_with_ids(dev, "dai_copy()");
+	//if (dev->direction == SOF_IPC_STREAM_PLAYBACK)
+	//	trace_dai_with_ids(dev, "dai_copy()");
 
 	/* get data sizes from DMA */
 	ret = dma_get_data_size(dd->chan, &avail_bytes, &free_bytes);
@@ -660,7 +661,8 @@ static int dai_copy(struct comp_dev *dev)
 			sample_bytes(dd->frame_fmt);
 	}
 
-	tracev_dai_with_ids(dev, "dai_copy(), copy_bytes = 0x%x", copy_bytes);
+	//if (dev->direction == SOF_IPC_STREAM_PLAYBACK)
+	//	trace_dai_with_ids(dev, "dai_copy(), copy_bytes = 0x%x", copy_bytes);
 
 	/* return if it's not stream start */
 	if (!copy_bytes && dd->start_position != dev->position)

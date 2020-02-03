@@ -11,6 +11,8 @@
 #include <sof/lib/alloc.h>
 #include <sof/lib/memory.h>
 #include <sof/list.h>
+#include <sof/schedule/ll_schedule.h>
+#include <sof/schedule/schedule.h>
 #include <sof/sof.h>
 #include <sof/string.h>
 #include <ipc/topology.h>
@@ -223,4 +225,45 @@ int comp_get_copy_limits(struct comp_dev *dev, struct comp_copy_limits *cl)
 	cl->sink_bytes = cl->frames * cl->sink_frame_bytes;
 
 	return 0;
+}
+
+static enum task_state comp_task(void *data)
+{
+	int ret = comp_copy(data);
+	if (ret < 0)
+		return SOF_TASK_STATE_COMPLETED;
+
+	return SOF_TASK_STATE_RESCHEDULE;
+}
+
+struct comp_dev *comp_make_shared(struct comp_dev *dev)
+{
+	dev = rrealloc(dev, SOF_MEM_ZONE_RUNTIME, SOF_MEM_FLAG_SHARED,
+		       SOF_MEM_CAPS_RAM, dev->size);
+	if (!dev) {
+		trace_comp_error("comp_make_shared() error: unable to realloc component");
+		return NULL;
+	}
+
+	list_init(&dev->bsource_list);
+	list_init(&dev->bsink_list);
+
+	dev->is_shared = true;
+
+	dev->task = rzalloc(SOF_MEM_ZONE_RUNTIME, 0, SOF_MEM_CAPS_RAM, sizeof(*dev->task));
+	if (!dev->task) {
+		rfree(dev);
+		return NULL;
+	}
+
+	/* TODO: only timer pipelines */
+
+	if (schedule_task_init_ll(dev->task, SOF_SCHEDULE_LL_TIMER, SOF_TASK_PRI_HIGH, comp_task,
+				  dev, dev->comp.core, 0) < 0) {
+		rfree(dev->task);
+		rfree(dev);
+		return NULL;
+	}
+
+	return dev;
 }

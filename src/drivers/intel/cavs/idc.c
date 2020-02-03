@@ -30,6 +30,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static SHARED_DATA struct idc_payload payload[PLATFORM_CORE_COUNT];
+
 /**
  * \brief Returns IDC data.
  * \return Pointer to pointer of IDC data.
@@ -124,12 +126,16 @@ int idc_send_msg(struct idc_msg *msg, uint32_t mode)
 {
 	struct timer *timer = timer_get();
 	struct idc *idc = *idc_get();
+	struct idc_payload *buff = idc->payload + msg->core;
 	int core = cpu_get_id();
 	uint64_t deadline;
 
 	tracev_idc("arch_idc_send_msg()");
 
 	idc->msg_processed[msg->core] = false;
+
+	if (msg->payload)
+		memcpy_s(buff, MAX_PAYLOAD_SIZE, msg->payload, msg->size);
 
 	idc_write(IPC_IDCIETC(msg->core), core, msg->extension);
 	idc_write(IPC_IDCITC(msg->core), core, msg->header | IPC_IDCITC_BUSY);
@@ -168,6 +174,87 @@ static void idc_ipc(void)
 	ipc_cmd(hdr);
 }
 
+static void idc_params(uint32_t comp_id)
+{
+	struct ipc *ipc = ipc_get();
+	struct ipc_comp_dev *dev;
+	struct idc *idc = *idc_get();
+	struct idc_payload *payload = idc->payload + cpu_get_id();
+	struct sof_ipc_stream_params *params =
+		(struct sof_ipc_stream_params *)payload;
+
+	dev = ipc_get_comp_by_id(ipc, comp_id);
+	if (!dev)
+		return;
+
+	comp_params(dev->cd, params);
+
+	platform_shared_commit(payload, sizeof(*payload));
+	platform_shared_commit(dev, sizeof(*dev));
+	platform_shared_commit(ipc, sizeof(*ipc));
+}
+
+static void idc_prepare(uint32_t comp_id)
+{
+	struct ipc *ipc = ipc_get();
+	struct ipc_comp_dev *dev;
+
+	dev = ipc_get_comp_by_id(ipc, comp_id);
+	if (!dev)
+		return;
+
+	comp_prepare(dev->cd);
+
+	platform_shared_commit(dev, sizeof(*dev));
+	platform_shared_commit(ipc, sizeof(*ipc));
+}
+
+static void idc_trigger(uint32_t comp_id)
+{
+	struct ipc *ipc = ipc_get();
+	struct ipc_comp_dev *dev;
+	struct idc *idc = *idc_get();
+	struct idc_payload *payload = idc->payload + cpu_get_id();
+	uint32_t *cmd = (uint32_t *)payload;
+
+	dev = ipc_get_comp_by_id(ipc, comp_id);
+	if (!dev)
+		return;
+
+	comp_trigger(dev->cd, *cmd);
+
+	switch (*cmd) {
+	case COMP_TRIGGER_START:
+	case COMP_TRIGGER_RELEASE:
+		schedule_task(dev->cd->task, 0, 1000);
+		break;
+	case COMP_TRIGGER_XRUN:
+	case COMP_TRIGGER_PAUSE:
+	case COMP_TRIGGER_STOP:
+		schedule_task_cancel(dev->cd->task);
+		break;
+	}
+
+	platform_shared_commit(payload, sizeof(*payload));
+	platform_shared_commit(dev, sizeof(*dev));
+	platform_shared_commit(ipc, sizeof(*ipc));
+}
+
+static void idc_reset(uint32_t comp_id)
+{
+	struct ipc *ipc = ipc_get();
+	struct ipc_comp_dev *dev;
+
+	dev = ipc_get_comp_by_id(ipc, comp_id);
+	if (!dev)
+		return;
+
+	comp_reset(dev->cd);
+
+	platform_shared_commit(dev, sizeof(*dev));
+	platform_shared_commit(ipc, sizeof(*ipc));
+}
+
 /**
  * \brief Executes IDC message based on type.
  * \param[in,out] msg Pointer to IDC message.
@@ -185,6 +272,18 @@ static void idc_cmd(struct idc_msg *msg)
 		break;
 	case iTS(IDC_MSG_IPC):
 		idc_ipc();
+		break;
+	case iTS(IDC_MSG_PARAMS):
+		idc_params(msg->extension);
+		break;
+	case iTS(IDC_MSG_PREPARE):
+		idc_prepare(msg->extension);
+		break;
+	case iTS(IDC_MSG_TRIGGER):
+		idc_trigger(msg->extension);
+		break;
+	case iTS(IDC_MSG_RESET):
+		idc_reset(msg->extension);
 		break;
 	default:
 		trace_idc_error("idc_cmd() error: invalid msg->header = %u",
@@ -271,6 +370,7 @@ int idc_init(void)
 	*idc = rzalloc(SOF_MEM_ZONE_SYS, 0, SOF_MEM_CAPS_RAM, sizeof(**idc));
 	(*idc)->busy_bit_mask = idc_get_busy_bit_mask(core);
 	(*idc)->done_bit_mask = idc_get_done_bit_mask(core);
+	(*idc)->payload = cache_to_uncache((struct idc_payload *)payload);
 
 	/* process task */
 	schedule_task_init_edf(&(*idc)->idc_task, &ops, *idc, core, 0);

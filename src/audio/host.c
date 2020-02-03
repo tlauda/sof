@@ -731,6 +731,9 @@ static uint32_t host_buffer_get_copy_bytes(struct comp_dev *dev)
 			return 0;
 		}
 
+		//if (dev->direction == SOF_IPC_STREAM_PLAYBACK)
+		//	trace_host("avail = 0x%x, free = 0x%x", avail_bytes, hd->local_buffer->stream.free);
+
 		/* calculate minimum size to copy */
 		if (dev->direction == SOF_IPC_STREAM_PLAYBACK)
 			copy_bytes = MIN(avail_bytes,
@@ -756,7 +759,8 @@ static int host_copy(struct comp_dev *dev)
 	uint32_t flags = 0;
 	int ret = 0;
 
-	tracev_host_with_ids(dev, "host_copy()");
+	//if (dev->direction == SOF_IPC_STREAM_PLAYBACK)
+	//	trace_host_with_ids(dev, "host_copy()");
 
 	if (dev->state != COMP_STATE_ACTIVE)
 		return 0;

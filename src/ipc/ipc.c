@@ -315,20 +315,26 @@ static int ipc_comp_to_buffer_connect(struct ipc_comp_dev *comp,
 {
 	int ret;
 
-	if (comp->core != buffer->core) {
-		trace_ipc_error("ipc_comp_to_buffer_connect() error: cores don't match %d != %d",
-				comp->core, buffer->core);
-		return -EINVAL;
-	}
-
 	if (!cpu_is_me(comp->core))
 		return ipc_process_on_core(comp->core);
 
 	trace_ipc("ipc: comp sink %d, source %d  -> connect", buffer->id,
 		  comp->id);
 
+	if (buffer->core != comp->core) {
+		buffer->cb->is_shared = true;
+
+		if (!comp->cd->is_shared && cpu_is_slave(comp->core)) {
+			comp->cd = comp_make_shared(comp->cd);
+			if (!comp->cd)
+				return -ENOMEM;
+		}
+	}
+
 	ret = pipeline_connect(comp->cd, buffer->cb,
 			       PPL_CONN_DIR_COMP_TO_BUFFER);
+
+	dcache_writeback_invalidate_region(buffer->cb, sizeof(*buffer->cb));
 
 	platform_shared_commit(comp, sizeof(*comp));
 	platform_shared_commit(buffer, sizeof(*buffer));
@@ -341,20 +347,26 @@ static int ipc_buffer_to_comp_connect(struct ipc_comp_dev *buffer,
 {
 	int ret;
 
-	if (buffer->core != comp->core) {
-		trace_ipc_error("ipc_comp_to_buffer_connect() error: cores don't match %d != %d",
-				buffer->core, comp->core);
-		return -EINVAL;
-	}
-
-	if (!cpu_is_me(buffer->core))
-		return ipc_process_on_core(buffer->core);
+	if (!cpu_is_me(comp->core))
+		return ipc_process_on_core(comp->core);
 
 	trace_ipc("ipc: comp sink %d, source %d  -> connect", comp->id,
 		  buffer->id);
 
+	if (buffer->core != comp->core) {
+		buffer->cb->is_shared = true;
+
+		if (!comp->cd->is_shared && cpu_is_slave(comp->core)) {
+			comp->cd = comp_make_shared(comp->cd);
+			if (!comp->cd)
+				return -ENOMEM;
+		}
+	}
+
 	ret = pipeline_connect(comp->cd, buffer->cb,
 			       PPL_CONN_DIR_BUFFER_TO_COMP);
+
+	dcache_writeback_invalidate_region(buffer->cb, sizeof(*buffer->cb));
 
 	platform_shared_commit(comp, sizeof(*comp));
 	platform_shared_commit(buffer, sizeof(*buffer));

@@ -20,6 +20,7 @@
 #include <sof/audio/format.h>
 #include <sof/audio/pipeline.h>
 #include <sof/debug/panic.h>
+#include <sof/drivers/idc.h>
 #include <sof/list.h>
 #include <sof/lib/dai.h>
 #include <sof/math/numbers.h>
@@ -279,12 +280,16 @@ struct comp_dev {
 				     *  available at source buffer required
 				     *  to run component's processing
 				     */
+	uint32_t size;
+	bool is_shared;		     /* on pipeline owned by different core */
 
 	/** common runtime configuration for downstream/upstream */
 	uint32_t direction;	/**< enum sof_ipc_stream_direction */
 
 	/** driver */
 	const struct comp_driver *drv;
+
+	struct task *task;
 
 	/* lists */
 	struct list_item bsource_list;	/**< list of source buffers */
@@ -363,6 +368,35 @@ struct comp_copy_limits {
 	__attribute__((section(".module_init"))) static void(*f)(void) = init
 #endif
 
+static inline void comp_cache_buffers(struct comp_dev *dev)
+{
+	struct list_item *src_buffers = &dev->bsource_list;
+	struct list_item *dst_buffers = &dev->bsink_list;
+	struct comp_buffer *buffer;
+	struct list_item *clist = src_buffers->next;
+	struct list_item *curr;
+
+	while (clist != src_buffers) {
+		curr = clist;
+		clist = clist->next;
+
+		buffer = container_of(curr, struct comp_buffer, sink_list);
+		if (buffer->is_shared)
+			dcache_writeback_invalidate_region(buffer, sizeof(*buffer));
+	}
+
+	clist = dst_buffers->next;
+
+	while (clist != dst_buffers) {
+		curr = clist;
+		clist = clist->next;
+
+		buffer = container_of(curr, struct comp_buffer, source_list);
+		if (buffer->is_shared)
+			dcache_writeback_invalidate_region(buffer, sizeof(*buffer));
+	}
+}
+
 /** @}*/
 
 /** \name Component registration
@@ -430,9 +464,22 @@ int comp_set_state(struct comp_dev *dev, int cmd);
 static inline int comp_params(struct comp_dev *dev,
 			      struct sof_ipc_stream_params *params)
 {
-	if (dev->drv->ops.params)
-		return dev->drv->ops.params(dev, params);
-	return 0;
+	int ret = 0;
+
+	if (dev->drv->ops.params) {
+		if (dev->is_shared && !cpu_is_me(dev->comp.core)) {
+			struct idc_msg msg = { IDC_MSG_PARAMS,
+				IDC_MSG_PARAMS_EXT(dev->comp.id), dev->comp.core,
+				params, sizeof(*params) };
+			ret = idc_send_msg(&msg, IDC_BLOCKING);
+		} else {
+			ret = dev->drv->ops.params(dev, params);
+			comp_cache_buffers(dev);
+			return ret;
+		}
+	}
+
+	return ret;
 }
 
 /**
@@ -473,7 +520,20 @@ static inline int comp_trigger(struct comp_dev *dev, int cmd)
 {
 	assert(dev->drv->ops.trigger);
 
-	return dev->drv->ops.trigger(dev, cmd);
+	int ret = 0;
+
+	if (dev->is_shared && !cpu_is_me(dev->comp.core)) {
+		struct idc_msg msg = { IDC_MSG_TRIGGER,
+			IDC_MSG_TRIGGER_EXT(dev->comp.id), dev->comp.core,
+			&cmd, sizeof(cmd) };
+		ret = idc_send_msg(&msg, IDC_BLOCKING);
+	} else {
+		ret = dev->drv->ops.trigger(dev, cmd);
+		comp_cache_buffers(dev);
+		return ret;
+	}
+
+	return ret;
 }
 
 /**
@@ -483,9 +543,21 @@ static inline int comp_trigger(struct comp_dev *dev, int cmd)
  */
 static inline int comp_prepare(struct comp_dev *dev)
 {
-	if (dev->drv->ops.prepare)
-		return dev->drv->ops.prepare(dev);
-	return 0;
+	int ret = 0;
+
+	if (dev->drv->ops.prepare) {
+		if (dev->is_shared && !cpu_is_me(dev->comp.core)) {
+			struct idc_msg msg = { IDC_MSG_PREPARE,
+				IDC_MSG_PREPARE_EXT(dev->comp.id), dev->comp.core };
+			ret = idc_send_msg(&msg, IDC_BLOCKING);
+		} else {
+			ret = dev->drv->ops.prepare(dev);
+			comp_cache_buffers(dev);
+			return ret;
+		}
+	}
+
+	return ret;
 }
 
 /**
@@ -497,7 +569,13 @@ static inline int comp_copy(struct comp_dev *dev)
 {
 	assert(dev->drv->ops.copy);
 
-	return dev->drv->ops.copy(dev);
+	int ret = 0;
+
+	ret = dev->drv->ops.copy(dev);
+
+	comp_cache_buffers(dev);
+
+	return ret;
 }
 
 /**
@@ -507,9 +585,21 @@ static inline int comp_copy(struct comp_dev *dev)
  */
 static inline int comp_reset(struct comp_dev *dev)
 {
-	if (dev->drv->ops.reset)
-		return dev->drv->ops.reset(dev);
-	return 0;
+	int ret = 0;
+
+	if (dev->drv->ops.reset) {
+		if (dev->is_shared && !cpu_is_me(dev->comp.core)) {
+			struct idc_msg msg = { IDC_MSG_RESET,
+				IDC_MSG_RESET_EXT(dev->comp.id), dev->comp.core };
+			ret = idc_send_msg(&msg, IDC_BLOCKING);
+		} else {
+			ret = dev->drv->ops.reset(dev);
+			comp_cache_buffers(dev);
+			return ret;
+		}
+	}
+
+	return ret;
 }
 
 /**
@@ -702,6 +792,8 @@ static inline bool comp_is_scheduling_source(struct comp_dev *dev)
  * @param cl Struct of parameters for use in copy function.
  */
 int comp_get_copy_limits(struct comp_dev *dev, struct comp_copy_limits *cl);
+
+struct comp_dev *comp_make_shared(struct comp_dev *dev);
 
 static inline struct comp_driver_list *comp_drivers_get(void)
 {

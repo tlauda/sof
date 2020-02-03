@@ -95,20 +95,28 @@ static int pipeline_for_each_comp(struct comp_dev *current,
 				  int dir)
 {
 	struct list_item *buffer_list = comp_buffer_list(current, dir);
-	struct list_item *clist;
+	struct list_item *clist = buffer_list->next;
 	struct comp_buffer *buffer;
 	struct comp_dev *buffer_comp;
+	struct list_item *curr;
 	int err = 0;
 
 	/* run this operation further */
-	list_for_item(clist, buffer_list) {
-		buffer = buffer_from_list(clist, struct comp_buffer, dir);
+	while (clist != buffer_list) {
+	//list_for_item(clist, buffer_list) {
+		curr = clist;
+		clist = clist->next;
+
+		buffer = buffer_from_list(curr, struct comp_buffer, dir);
 
 		/* execute operation on buffer */
 		if (buff_func)
 			buff_func(buffer, buff_data);
 
 		buffer_comp = buffer_get_comp(buffer, dir);
+
+		if (buffer->is_shared)
+			dcache_writeback_invalidate_region(buffer, sizeof(*buffer));
 
 		/* don't go further if this component is not connected */
 		if (!buffer_comp)
@@ -130,9 +138,9 @@ static int pipeline_comp_complete(struct comp_dev *current, void *data,
 {
 	struct pipeline_data *ppl_data = data;
 
-	tracev_pipe_with_ids(ppl_data->p, "pipeline_comp_complete(), "
-			     "current->comp.id = %u, dir = %u",
-			     current->comp.id, dir);
+	trace_pipe_with_ids(ppl_data->p, "pipeline_comp_complete(), "
+			     "current = %p, current->comp.id = %u, dir = %u",
+			     (uintptr_t)current, current->comp.id, dir);
 
 	if (!comp_is_single_pipeline(current, ppl_data->start)) {
 		tracev_pipe_with_ids(ppl_data->p, "pipeline_comp_complete(), "
@@ -721,7 +729,7 @@ static int pipeline_comp_copy(struct comp_dev *current, void *data, int dir)
 	}
 
 	/* copy to downstream immediately */
-	if (dir == PPL_DIR_DOWNSTREAM) {
+	if (dir == PPL_DIR_DOWNSTREAM && cpu_get_id() == current->comp.core) {
 		err = comp_copy(current);
 		if (err < 0 || err == PPL_STATUS_PATH_STOP)
 			return err;
@@ -732,7 +740,7 @@ static int pipeline_comp_copy(struct comp_dev *current, void *data, int dir)
 	if (err < 0 || err == PPL_STATUS_PATH_STOP)
 		return err;
 
-	if (dir == PPL_DIR_UPSTREAM)
+	if (dir == PPL_DIR_UPSTREAM && cpu_get_id() == current->comp.core)
 		err = comp_copy(current);
 
 	return err;

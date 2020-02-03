@@ -79,14 +79,35 @@
 #define IDC_MSG_IPC		IDC_TYPE(0x4)
 #define IDC_MSG_IPC_EXT		IDC_EXTENSION(0x0)
 
+#define IDC_MSG_PARAMS		IDC_TYPE(0x5)
+#define IDC_MSG_PARAMS_EXT(x)	IDC_EXTENSION(x)
+
+#define IDC_MSG_PREPARE		IDC_TYPE(0x6)
+#define IDC_MSG_PREPARE_EXT(x)	IDC_EXTENSION(x)
+
+#define IDC_MSG_TRIGGER		IDC_TYPE(0x7)
+#define IDC_MSG_TRIGGER_EXT(x)	IDC_EXTENSION(x)
+
+#define IDC_MSG_RESET		IDC_TYPE(0x8)
+#define IDC_MSG_RESET_EXT(x)	IDC_EXTENSION(x)
+
 /** \brief Decodes IDC message type. */
 #define iTS(x)	(((x) >> IDC_TYPE_SHIFT) & IDC_TYPE_MASK)
+
+#define MAX_PAYLOAD_SIZE	96
+
+struct idc_payload {
+	uint32_t size;
+	uint8_t data[MAX_PAYLOAD_SIZE];
+};
 
 /** \brief IDC message. */
 struct idc_msg {
 	uint32_t header;	/**< header value */
 	uint32_t extension;	/**< extension value */
 	uint32_t core;		/**< core id */
+	void *payload;
+	uint32_t size;
 };
 
 /** \brief IDC data. */
@@ -96,6 +117,7 @@ struct idc {
 	struct idc_msg received_msg;	/**< received message */
 	struct task idc_task;		/**< IDC processing task */
 	bool msg_processed[PLATFORM_CORE_COUNT];
+	struct idc_payload *payload;
 	int irq;
 };
 

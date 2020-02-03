@@ -56,6 +56,8 @@ struct comp_dev;
 
 /* audio component buffer - connects 2 audio components together in pipeline */
 struct comp_buffer {
+	spinlock_t *lock;
+
 	/* data buffer */
 	struct audio_stream stream;
 
@@ -64,6 +66,7 @@ struct comp_buffer {
 	uint32_t pipeline_id;
 	uint32_t caps;
 	uint32_t core;
+	bool is_shared;		/* between components from different cores */
 
 	/* connected components */
 	struct comp_dev *source;	/* source component */
@@ -134,8 +137,8 @@ static inline void buffer_zero(struct comp_buffer *buffer)
 	tracev_buffer_with_ids(buffer, "stream_zero()");
 
 	bzero(buffer->stream.addr, buffer->stream.size);
-	if (buffer->caps & SOF_MEM_CAPS_DMA)
-		dcache_writeback_region(buffer->stream.addr,
+	if ((buffer->caps & SOF_MEM_CAPS_DMA) || buffer->is_shared)
+		dcache_writeback_invalidate_region(buffer->stream.addr,
 					buffer->stream.size);
 }
 

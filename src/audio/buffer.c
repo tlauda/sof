@@ -40,9 +40,19 @@ struct comp_buffer *buffer_alloc(uint32_t size, uint32_t caps, uint32_t align)
 		return NULL;
 	}
 
+	buffer->lock = rzalloc(SOF_MEM_ZONE_RUNTIME, SOF_MEM_FLAG_SHARED, SOF_MEM_CAPS_RAM,
+			 sizeof(*buffer->lock));
+	if (!buffer->lock) {
+		rfree(buffer);
+		trace_buffer_error("buffer_alloc() error: "
+				   "could not alloc lock structure");
+		return NULL;
+	}
+
 	buffer->stream.addr = rballoc_align(0, caps, size, align);
 	if (!buffer->stream.addr) {
 		rfree(buffer);
+		rfree(buffer->lock);
 		trace_buffer_error("buffer_alloc() error: "
 				   "could not alloc size = %u "
 				   "bytes of type = %u",
@@ -72,6 +82,8 @@ struct comp_buffer *buffer_new(struct sof_ipc_buffer *desc)
 		buffer->pipeline_id = desc->comp.pipeline_id;
 		buffer->core = desc->comp.core;
 	}
+
+	dcache_writeback_invalidate_region(buffer, sizeof(*buffer));
 
 	return buffer;
 }
@@ -126,6 +138,7 @@ void buffer_free(struct comp_buffer *buffer)
 	list_item_del(&buffer->source_list);
 	list_item_del(&buffer->sink_list);
 	rfree(buffer->stream.addr);
+	rfree(buffer->lock);
 	rfree(buffer);
 }
 
@@ -151,6 +164,20 @@ void comp_update_buffer_produce(struct comp_buffer *buffer, uint32_t bytes)
 	}
 
 	irq_local_disable(flags);
+
+	if (buffer->is_shared) {
+		uint32_t head = bytes;
+		uint32_t tail = 0;
+
+		if ((char *)buffer->stream.w_ptr + bytes > (char *)buffer->stream.end_addr) {
+			head = (char *)buffer->stream.end_addr - (char *)buffer->stream.w_ptr;
+			tail = bytes - head;
+		}
+
+		dcache_writeback_region(buffer->stream.w_ptr, head);
+		if (tail)
+			dcache_writeback_region(buffer->stream.addr, tail);
+	}
 
 	audio_stream_produce(&buffer->stream, bytes);
 
@@ -194,6 +221,20 @@ void comp_update_buffer_consume(struct comp_buffer *buffer, uint32_t bytes)
 	}
 
 	irq_local_disable(flags);
+
+	if (buffer->is_shared) {
+		uint32_t head = bytes;
+		uint32_t tail = 0;
+
+		if ((char *)buffer->stream.r_ptr + bytes > (char *)buffer->stream.end_addr) {
+			head = (char *)buffer->stream.end_addr - (char *)buffer->stream.r_ptr;
+			tail = bytes - head;
+		}
+
+		dcache_invalidate_region(buffer->stream.r_ptr, head);
+		if (tail)
+			dcache_invalidate_region(buffer->stream.addr, tail);
+	}
 
 	audio_stream_consume(&buffer->stream, bytes);
 

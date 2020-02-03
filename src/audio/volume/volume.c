@@ -161,6 +161,7 @@ static struct comp_dev *volume_new(struct sof_ipc_comp *comp)
 	struct sof_ipc_comp_volume *ipc_vol =
 		(struct sof_ipc_comp_volume *)comp;
 	struct comp_data *cd;
+	uint32_t size = COMP_SIZE(struct sof_ipc_comp_volume);
 	int i;
 	int ret;
 
@@ -171,10 +172,11 @@ static struct comp_dev *volume_new(struct sof_ipc_comp *comp)
 		return NULL;
 	}
 
-	dev = rzalloc(SOF_MEM_ZONE_RUNTIME, 0, SOF_MEM_CAPS_RAM,
-		      COMP_SIZE(struct sof_ipc_comp_volume));
+	dev = rzalloc(SOF_MEM_ZONE_RUNTIME, 0, SOF_MEM_CAPS_RAM, size);
 	if (!dev)
 		return NULL;
+
+	dev->size = size;
 
 	vol = (struct sof_ipc_comp_volume *)&dev->comp;
 	ret = memcpy_s(vol, sizeof(*vol), ipc_vol,
@@ -188,8 +190,6 @@ static struct comp_dev *volume_new(struct sof_ipc_comp *comp)
 	}
 
 	comp_set_drvdata(dev, cd);
-	schedule_task_init_ll(&cd->volwork, SOF_SCHEDULE_LL_TIMER,
-			      SOF_TASK_PRI_MED, vol_work, dev, 0, 0);
 
 	/* Set the default volumes. If IPC sets min_value or max_value to
 	 * not-zero, use them. Otherwise set to internal limits and notify
@@ -691,6 +691,9 @@ static int volume_prepare(struct comp_dev *dev)
 		cd->volume[i] = cd->vol_min;
 		volume_set_chan(dev, i, cd->tvolume[i], false);
 	}
+
+	schedule_task_init_ll(&cd->volwork, SOF_SCHEDULE_LL_TIMER,
+			      SOF_TASK_PRI_MED, vol_work, dev, 0, 0);
 
 	return 0;
 

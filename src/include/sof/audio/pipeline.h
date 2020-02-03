@@ -106,12 +106,6 @@ static inline bool pipeline_is_timer_driven(struct pipeline *p)
 	return p->ipc_pipe.time_domain == SOF_TIME_DOMAIN_TIMER;
 }
 
-/* checks if pipeline is scheduled on this core */
-static inline bool pipeline_is_this_cpu(struct pipeline *p)
-{
-	return p->ipc_pipe.core == cpu_get_id();
-}
-
 /* pipeline creation and destruction */
 struct pipeline *pipeline_new(struct sof_ipc_pipe_new *pipe_desc,
 	struct comp_dev *cd);
