@@ -789,7 +789,7 @@ static int hda_dma_link_check_xrun(struct dma_chan_data *chan)
 					  "xrun detected");
 			dma_chan_reg_update_bits(chan, DGCS, DGCS_BOR,
 						 DGCS_BOR);
-			return -ENODATA;
+			//return -ENODATA;
 		}
 	}
 
